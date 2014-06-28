@@ -6,3 +6,4 @@ MaizePlantDetector
 **Solutions:**
 * Get the green channel and subtract with the others to eliminate white areas
 * Use HSV like [here](http://www.aishack.in/2010/01/thresholding/)
+* Morph op to remove pixels which are not maize 
