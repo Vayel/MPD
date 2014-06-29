@@ -10,6 +10,7 @@
         "dilate (2,2) x5"
       ]
     }
-  }, 
+  },  
+  "plants": ,
   "source": "5.jpg"
 }
