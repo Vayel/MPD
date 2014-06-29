@@ -4,10 +4,14 @@
 
 # http://www.tech-faq.com/hsv.html
 
+import os
 import sys
+import json
+import time
 import numpy as np
 import cv2
 from cv_functions import loadImg
+from global_functions import ensureDir
 
 
 TB_WIN_LABEL = "Trackbars"
@@ -45,7 +49,7 @@ MAX_ERODE_ITERATIONS = 10
 
 DILATE_ITERATIONS_TB_LABEL = "dilate"
 DEFAULT_DILATE_ITERATIONS = 4
-MAX_DILATE_ITERATIONS = 10
+MAX_DILATE_ITERATIONS = 30
 
 ESCAPE_KEY = 27
 
@@ -64,15 +68,45 @@ def createTrackbars():
   cv2.createTrackbar(ERODE_ITERATIONS_TB_LABEL, TB_WIN_LABEL, DEFAULT_ERODE_ITERATIONS, MAX_ERODE_ITERATIONS, nothing)
   cv2.createTrackbar(DILATE_ITERATIONS_TB_LABEL, TB_WIN_LABEL, DEFAULT_DILATE_ITERATIONS, MAX_DILATE_ITERATIONS, nothing)
 
-def main(path):
-  src = loadImg(path)
-  src = cv2.resize(src, (0,0), fx=0.3, fy=0.3)
+def updateJson(srcPath, dstPath, data):
+  srcDirname, srcImgname = os.path.split(srcPath)
+  dstDirname, dstImgname = os.path.split(dstPath)
+  jsonPath = os.path.join(dstDirname, "details.json")
+  
+  jsonData = {}
+  jsonData["source"] = srcImgname
+  jsonData["images"] = {}
+  
+  if os.path.exists(jsonPath):
+    infile = open(jsonPath, "r")
+    jsonData = json.loads(infile.read())
+    infile.close()
+  
+  operations = []
+  operations.append("h " + data["minH"] + "-" + data["maxH"])
+  operations.append("s " + data["minS"] + "-" + data["maxS"])
+  operations.append("v " + data["minV"] + "-" + data["maxV"])
+  operations.append("erode " + data["erodeKernel"] + " x" + data["erodeIterations"])
+  operations.append("dilate " + data["dilateKernel"] + " x" + data["dilateIterations"])
+    
+  jsonData["images"][dstImgname] = {}
+  jsonData["images"][dstImgname]["date"] = time.strftime("%Y-%m-%d", time.gmtime())
+  jsonData["images"][dstImgname]["operations"] = operations
+  
+  with open(jsonPath, 'w') as outfile:
+    json.dump(jsonData, outfile, indent = 2)
+
+def main(srcPath, dstPath):
+  src = loadImg(srcPath)
+  src = cv2.resize(src, (0,0), fx=0.5, fy=0.5)
   gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
   hsv = cv2.cvtColor(src, cv2.COLOR_BGR2HSV)
   
+  ensureDir(dstPath)
+  
   createTrackbars()
   cv2.imshow("Source", src)
-  print "Press Escape to quit."
+  print "Press Escape to quit and save."
   
   while True:
     k = cv2.waitKey(1) & 0xFF
@@ -103,19 +137,52 @@ def main(path):
     masked = cv2.dilate(masked, kernel, iterations = dilateIterations)
     
     cv2.imshow("Masked", masked)
-    
   
+  data = {}
+  data["minH"] = str(minHue)
+  data["maxH"] = str(maxHue)
+  data["minS"] = str(minSat)
+  data["maxS"] = str(maxSat)
+  data["minV"] = str(minVal)
+  data["maxV"] = str(maxVal)
+  data["erodeKernel"] = "(" + str(kernelSize) + "," + str(kernelSize) + ")"
+  data["erodeIterations"] = str(erodeIterations)
+  data["dilateKernel"] = "(" + str(kernelSize) + "," + str(kernelSize) + ")"
+  data["dilateIterations"] = str(dilateIterations)
+  
+  updateJson(srcPath, dstPath, data)
+    
+  cv2.imwrite(dstPath, masked)
   cv2.destroyAllWindows()
 
 def printUsage():
   print """
   USAGE:
-  python hue.py <img-path>
-  e.g.: python hue.py --src foo/bar.jpg
+  python hsv.py --src <img-path> --dst <img-path>
+  e.g.: python hsv.py --src foo/bar.jpg --dst bar/foo.jpg
   """
+
+def parseArgs(args):
+  src, dst = None, None
+  
+  for i in range(len(args)):
+    try:
+      if args[i] == "--src":
+        src = args[i+1]
+      elif args[i] == "--dst":
+        dst = args[i+1]
+    except:
+      break
+  
+  if src == None or dst == None:
+    printUsage()
+    sys.exit()
+    
+  return src, dst
   
 if __name__ == "__main__":
   if len(sys.argv) > 1:
-    main(sys.argv[1])
+    src, dst = parseArgs(sys.argv[1:])
+    main(src, dst)
   else:
     printUsage()

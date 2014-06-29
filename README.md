@@ -1,5 +1,4 @@
-MaizePlantDetector
-=================
+# MaizePlantDetector
 
 **Purpose:** detecting and counting maize plants in an image.
 
