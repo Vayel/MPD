@@ -52,12 +52,14 @@ DEFAULT_DILATE_ITERATIONS = 4
 MAX_DILATE_ITERATIONS = 30
 
 ESCAPE_KEY = 27
+RESIZABLE_WINDOW = 0
 
 def nothing(x):
   pass
 
+
 def createTrackbars():
-  cv2.namedWindow(TB_WIN_LABEL)
+  cv2.namedWindow(TB_WIN_LABEL, RESIZABLE_WINDOW)
   cv2.createTrackbar(MIN_HUE_TB_LABEL, TB_WIN_LABEL, MIN_GREEN_HUE, MAX_HUE_VALUE, nothing)
   cv2.createTrackbar(MIN_SAT_TB_LABEL, TB_WIN_LABEL, MIN_GREEN_SAT, MAX_SAT_VALUE, nothing)
   cv2.createTrackbar(MIN_VAL_TB_LABEL, TB_WIN_LABEL, MIN_GREEN_VAL, MAX_VAL_VALUE, nothing)
@@ -67,6 +69,7 @@ def createTrackbars():
   cv2.createTrackbar(KERNEL_SIZE_TB_LABEL, TB_WIN_LABEL, DEFAULT_KERNEL_SIZE, MAX_KERNEL_SIZE, nothing)
   cv2.createTrackbar(ERODE_ITERATIONS_TB_LABEL, TB_WIN_LABEL, DEFAULT_ERODE_ITERATIONS, MAX_ERODE_ITERATIONS, nothing)
   cv2.createTrackbar(DILATE_ITERATIONS_TB_LABEL, TB_WIN_LABEL, DEFAULT_DILATE_ITERATIONS, MAX_DILATE_ITERATIONS, nothing)
+
 
 def updateJson(srcPath, dstPath, data):
   srcDirname, srcImgname = os.path.split(srcPath)
@@ -96,17 +99,22 @@ def updateJson(srcPath, dstPath, data):
   with open(jsonPath, 'w') as outfile:
     json.dump(jsonData, outfile, indent = 2)
 
+
 def main(srcPath, dstPath):
-  src = loadImg(srcPath)
-  src = cv2.resize(src, (0,0), fx=0.5, fy=0.5)
-  gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
-  hsv = cv2.cvtColor(src, cv2.COLOR_BGR2HSV)
+  SMALL_FACTOR = 0.3 
   
-  ensureDir(dstPath)
+  src = loadImg(srcPath)
+  small = cv2.resize(src, (0,0), fx=SMALL_FACTOR, fy=SMALL_FACTOR)
+  gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+  hsv = cv2.cvtColor(small, cv2.COLOR_BGR2HSV)
+  
+  if dstPath != None:
+    ensureDir(dstPath)
   
   createTrackbars()
+  cv2.namedWindow("Source", RESIZABLE_WINDOW)
   cv2.imshow("Source", src)
-  print "Press Escape to quit and save."
+  print "Press Escape to quit."
   
   while True:
     k = cv2.waitKey(1) & 0xFF
@@ -137,30 +145,36 @@ def main(srcPath, dstPath):
     masked = cv2.dilate(masked, kernel, iterations = dilateIterations)
     
     cv2.imshow("Masked", masked)
-  
-  data = {}
-  data["minH"] = str(minHue)
-  data["maxH"] = str(maxHue)
-  data["minS"] = str(minSat)
-  data["maxS"] = str(maxSat)
-  data["minV"] = str(minVal)
-  data["maxV"] = str(maxVal)
-  data["erodeKernel"] = "(" + str(kernelSize) + "," + str(kernelSize) + ")"
-  data["erodeIterations"] = str(erodeIterations)
-  data["dilateKernel"] = "(" + str(kernelSize) + "," + str(kernelSize) + ")"
-  data["dilateIterations"] = str(dilateIterations)
-  
-  updateJson(srcPath, dstPath, data)
     
-  cv2.imwrite(dstPath, masked)
+  if dstPath != None:
+    data = {}
+    data["minH"] = str(minHue)
+    data["maxH"] = str(maxHue)
+    data["minS"] = str(minSat)
+    data["maxS"] = str(maxSat)
+    data["minV"] = str(minVal)
+    data["maxV"] = str(maxVal)
+    data["erodeKernel"] = "(" + str(kernelSize) + "," + str(kernelSize) + ")"
+    data["erodeIterations"] = str(erodeIterations)
+    data["dilateKernel"] = "(" + str(kernelSize) + "," + str(kernelSize) + ")"
+    data["dilateIterations"] = str(dilateIterations)
+    
+    updateJson(srcPath, dstPath, data)
+      
+    cv2.imwrite(dstPath, masked)
+    
   cv2.destroyAllWindows()
+
 
 def printUsage():
   print """
   USAGE:
-  python hsv.py --src <img-path> --dst <img-path>
-  e.g.: python hsv.py --src foo/bar.jpg --dst bar/foo.jpg
+  python hsv.py --src <img-path> [--dst <img-path>]
+  e.g.: 
+  python hsv.py --src foo/bar.jpg
+  python hsv.py --src foo/bar.jpg --dst bar/foo.jpg
   """
+
 
 def parseArgs(args):
   src, dst = None, None
@@ -174,11 +188,12 @@ def parseArgs(args):
     except:
       break
   
-  if src == None or dst == None:
+  if src == None:
     printUsage()
     sys.exit()
     
   return src, dst
+
   
 if __name__ == "__main__":
   if len(sys.argv) > 1:
